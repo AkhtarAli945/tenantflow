@@ -11,7 +11,17 @@ for (const k of ["MONGODB_URI", "JWT_SECRET", "GROQ_API_KEY"])
   if (!process.env[k]) { console.error(`Missing ${k} in .env`); process.exit(1); }
 
 const app = express();
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || true }));
+
+// Allowed websites: localhost (local testing), this project's Vercel links,
+// and anything listed in CLIENT_ORIGIN (comma separated, optional)
+const extra = (process.env.CLIENT_ORIGIN || "").split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean);
+const allowed = (origin) =>
+  !origin ||
+  /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) ||
+  /^https:\/\/tenantflow[\w-]*\.vercel\.app$/.test(origin) ||
+  extra.includes(origin);
+app.use(cors({ origin: (origin, cb) => cb(null, allowed(origin)) }));
+
 app.use(express.json());
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api", routes);
